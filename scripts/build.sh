@@ -2,7 +2,7 @@
 # ==============================================================================
 # F77 OS - Live Bootable ISO Builder
 # Base: Ubuntu 24.04 LTS (Noble Numbat)
-# Output: f77-os-v1.0-amd64.iso (UEFI + BIOS Hybrid)
+# Output: f77-os-v1.0-amd64.iso (Hybrid BIOS + UEFI Bootable)
 # ==============================================================================
 
 set -euo pipefail
@@ -20,7 +20,7 @@ ISO_NAME="f77-os-v1.0-amd64.iso"
 rm -rf "${WORK_DIR}"
 mkdir -p "${CHROOT_DIR}" "${IMAGE_DIR}"
 
-echo "[1/7] Bootstrapping Base System (Ubuntu 24.04 Noble)..."
+echo "[1/6] Bootstrapping Base System (Ubuntu 24.04 Noble)..."
 debootstrap \
     --arch=amd64 \
     --variant=minbase \
@@ -28,7 +28,7 @@ debootstrap \
     "${CHROOT_DIR}" \
     http://archive.ubuntu.com/ubuntu/
 
-echo "[2/7] Mounting virtual filesystems for chroot..."
+echo "[2/6] Mounting virtual filesystems for chroot..."
 mount --bind /dev "${CHROOT_DIR}/dev"
 mount --bind /run "${CHROOT_DIR}/run"
 mount -t devpts devpts "${CHROOT_DIR}/dev/pts"
@@ -45,7 +45,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-echo "[3/7] Configuring Repositories & Installing Packages..."
+echo "[3/6] Configuring Repositories & Installing Packages..."
 cat << 'EOF' > "${CHROOT_DIR}/etc/apt/sources.list"
 deb http://archive.ubuntu.com/ubuntu/ noble main restricted universe multiverse
 deb http://archive.ubuntu.com/ubuntu/ noble-updates main restricted universe multiverse
@@ -59,14 +59,20 @@ chmod +x "${CHROOT_DIR}/tmp/setup-desktop.sh"
 
 chroot "${CHROOT_DIR}" /bin/bash << 'EOF'
 export DEBIAN_FRONTEND=noninteractive
+export DEBCONF_NONINTERACTIVE_SEEN=true
+echo "debconf debconf/frontend select Noninteractive" | debconf-set-selections
+echo "wireshark-common wireshark-common/install-setuid boolean true" | debconf-set-selections || true
+
 apt-get update
 
-# Install packages with resilience
-while read -r pkg; do
-    [[ -z "$pkg" || "$pkg" =~ ^# ]] && continue
-    echo "Installing: $pkg..."
-    apt-get install -y --no-install-recommends "$pkg" || echo "Warning: Failed to install $pkg (skipping)"
-done < /tmp/packages.list
+# Install all packages
+PACKAGES=$(grep -v '^#' /tmp/packages.list | grep -v '^$' | tr '\n' ' ')
+apt-get install -y --no-install-recommends ${PACKAGES} || {
+    echo "Batch install encountered missing package, falling back to individual installation..."
+    for pkg in ${PACKAGES}; do
+        apt-get install -y --no-install-recommends "$pkg" || echo "Skipped: $pkg"
+    done
+}
 
 # Run desktop setup
 /tmp/setup-desktop.sh || true
@@ -84,20 +90,27 @@ apt-get clean
 rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 EOF
 
-echo "[4/7] Extracting Kernel & Initrd for Live Boot..."
+echo "[4/6] Extracting Kernel & Initrd for Live Boot..."
 mkdir -p "${IMAGE_DIR}/casper"
-VMLINUZ=$(ls -1 "${CHROOT_DIR}/boot/vmlinuz-"* | head -n 1)
-INITRD=$(ls -1 "${CHROOT_DIR}/boot/initrd.img-"* | head -n 1)
+VMLINUZ=$(ls -1 "${CHROOT_DIR}/boot/vmlinuz-"* 2>/dev/null | head -n 1 || true)
+INITRD=$(ls -1 "${CHROOT_DIR}/boot/initrd.img-"* 2>/dev/null | head -n 1 || true)
+
+if [ -z "${VMLINUZ}" ] || [ -z "${INITRD}" ]; then
+    echo "ERROR: Kernel or initrd not found in ${CHROOT_DIR}/boot!"
+    ls -la "${CHROOT_DIR}/boot" || true
+    exit 1
+fi
+
 cp "${VMLINUZ}" "${IMAGE_DIR}/casper/vmlinuz"
 cp "${INITRD}" "${IMAGE_DIR}/casper/initrd"
 
-echo "[5/7] Compressing Root Filesystem into SquashFS..."
+echo "[5/6] Compressing Root Filesystem into SquashFS..."
 mksquashfs "${CHROOT_DIR}" "${IMAGE_DIR}/casper/filesystem.squashfs" \
     -comp zstd \
     -e boot \
     -noappend
 
-echo "[6/7] Setting Up GRUB Bootloader & EFI Images..."
+echo "[6/6] Setting Up GRUB & Building Hybrid ISO with grub-mkrescue..."
 mkdir -p "${IMAGE_DIR}/boot/grub"
 cat << 'EOF' > "${IMAGE_DIR}/boot/grub/grub.cfg"
 set default="0"
@@ -119,31 +132,8 @@ menuentry "F77 OS (Safe Graphics Mode)" {
 }
 EOF
 
-# Build standalone EFI binary for UEFI boot
-mkdir -p "${IMAGE_DIR}/EFI/BOOT"
-grub-mkstandalone \
-    --format=x86_64-efi \
-    --output="${IMAGE_DIR}/EFI/BOOT/BOOTX64.EFI" \
-    --locales="" \
-    --fonts="" \
-    "boot/grub/grub.cfg=${IMAGE_DIR}/boot/grub/grub.cfg"
-
-# Create bootable FAT EFI image
-dd if=/dev/zero of="${IMAGE_DIR}/boot/grub/efi.img" bs=1M count=10
-mkfs.vfat "${IMAGE_DIR}/boot/grub/efi.img"
-mmd -i "${IMAGE_DIR}/boot/grub/efi.img" ::EFI ::EFI/BOOT
-mcopy -i "${IMAGE_DIR}/boot/grub/efi.img" "${IMAGE_DIR}/EFI/BOOT/BOOTX64.EFI" ::EFI/BOOT/BOOTX64.EFI
-
-echo "[7/7] Generating Hybrid Bootable ISO Image with Xorriso..."
-xorriso -as mkisofs \
-    -r -V "F77_OS_LIVE" \
-    -o "${ISO_NAME}" \
-    -J -l \
-    -append_partition 2 0xef "${IMAGE_DIR}/boot/grub/efi.img" \
-    -appended_part_as_gpt \
-    -e --interval:appended_partition_2:all:: \
-    -no-emul-boot \
-    "${IMAGE_DIR}"
+# Use official grub-mkrescue which automatically creates hybrid UEFI + BIOS ISO
+grub-mkrescue -o "${ISO_NAME}" "${IMAGE_DIR}" -- -volid "F77_OS_LIVE"
 
 sha256sum "${ISO_NAME}" > "${ISO_NAME}.sha256"
 
