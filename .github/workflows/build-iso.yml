@@ -1,0 +1,74 @@
+name: Build F77 OS Live ISO
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build F77 OS Hybrid ISO
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Free Disk Space on Runner
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          df -h
+
+      - name: Install Host ISO Build Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            debootstrap \
+            squashfs-tools \
+            xorriso \
+            grub-pc-bin \
+            grub-efi-amd64-bin \
+            mtools \
+            dosfstools \
+            curl \
+            zstd
+
+      - name: Make Scripts Executable
+        run: |
+          chmod +x scripts/build.sh
+          chmod +x config/setup-desktop.sh
+
+      - name: Run Master ISO Builder
+        run: |
+          sudo bash scripts/build.sh
+
+      - name: Upload ISO Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: F77-OS-v1.0-amd64
+          path: |
+            f77-os-v1.0-amd64.iso
+            f77-os-v1.0-amd64.iso.sha256
+          retention-days: 7
+
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.0
+          name: F77 OS v1.0 Hybrid Edition
+          body: |
+            ## F77 OS v1.0 (Hybrid Edition)
+            - **Base:** Ubuntu 24.04 LTS (Noble Numbat)
+            - **Desktop:** KDE Plasma (macOS Global Menu + Windows 11 Floating Centered Dock)
+            - **Subsystems:** Waydroid (Android), Wine (Windows .exe), Kali Linux Security Suite.
+          files: |
+            f77-os-v1.0-amd64.iso
+            f77-os-v1.0-amd64.iso.sha256
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,88 @@
+# ==============================================================================
+# F77 OS - Master Package Selection
+# ==============================================================================
+
+# Core System & Linux Kernel
+linux-generic
+casper
+lupin-casper
+discover
+laptop-detect
+os-prober
+grub-efi-amd64-signed
+grub-pc-bin
+shim-signed
+
+# System Services & Network
+systemd
+systemd-sysv
+network-manager
+network-manager-gnome
+wpasupplicant
+wireless-tools
+bluez
+pulseaudio-module-bluetooth
+pipewire
+pipewire-audio
+curl
+wget
+git
+sudo
+nano
+htop
+neofetch
+
+# Desktop Environment: KDE Plasma 6 (Lightweight, Highly Customizable)
+plasma-desktop
+plasma-workspace
+plasma-nm
+plasma-pa
+kscreen
+kinfocenter
+dolphin
+konsole
+sddm
+sddm-theme-breeze
+breeze-icon-theme
+fonts-noto
+fonts-noto-color-emoji
+fonts-inter
+plymouth
+plymouth-themes
+
+# Graphical Installer
+calamares
+calamares-settings-ubuntu
+
+# Android Subsystem Engine: Waydroid & Container Primitives
+lxc
+lxd-installer
+iptables
+dnsmasq
+curl
+ca-certificates
+
+# Windows Compatibility Layer
+wine64
+wine32
+winetricks
+
+# Kali Linux & Security / Pentesting Core Suite
+nmap
+wireshark
+tshark
+aircrack-ng
+hydra
+sqlmap
+nikto
+netcat-openbsd
+tcpdump
+whois
+traceroute
+
+# Media & Utilities
+vlc
+ark
+gparted
+flatpak
+plasma-discover-backend-flatpak
