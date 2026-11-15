@@ -54,3 +54,4 @@ Burn the ISO to a USB flash drive (minimum 8GB) using:
 * **BalenaEtcher** (Mac / Linux / Windows)
 
 Boot in **UEFI** or **Legacy BIOS** mode. F77 OS supports Live-Boot (try without installing) and permanent installation via Calamares installer.
+

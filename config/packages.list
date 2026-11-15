@@ -1,11 +1,10 @@
 # ==============================================================================
-# F77 OS - Master Package Selection
+# F77 OS - Master Package Selection (Ubuntu 24.04 LTS Noble)
 # ==============================================================================
 
 # Core System & Linux Kernel
 linux-generic
 casper
-lupin-casper
 discover
 laptop-detect
 os-prober
@@ -21,7 +20,6 @@ network-manager-gnome
 wpasupplicant
 wireless-tools
 bluez
-pulseaudio-module-bluetooth
 pipewire
 pipewire-audio
 curl
@@ -32,7 +30,7 @@ nano
 htop
 neofetch
 
-# Desktop Environment: KDE Plasma 6 (Lightweight, Highly Customizable)
+# Desktop Environment: KDE Plasma 6
 plasma-desktop
 plasma-workspace
 plasma-nm
@@ -52,11 +50,9 @@ plymouth-themes
 
 # Graphical Installer
 calamares
-calamares-settings-ubuntu
 
-# Android Subsystem Engine: Waydroid & Container Primitives
+# Android Subsystem Engine Primitives
 lxc
-lxd-installer
 iptables
 dnsmasq
 curl
@@ -64,7 +60,6 @@ ca-certificates
 
 # Windows Compatibility Layer
 wine64
-wine32
 winetricks
 
 # Kali Linux & Security / Pentesting Core Suite

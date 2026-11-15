@@ -5,6 +5,9 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Build F77 OS Hybrid ISO
@@ -33,6 +36,7 @@ jobs:
             xorriso \
             grub-pc-bin \
             grub-efi-amd64-bin \
+            grub-common \
             mtools \
             dosfstools \
             curl \

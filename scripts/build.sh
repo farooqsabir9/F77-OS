@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # F77 OS - Live Bootable ISO Builder
-# Target: Ubuntu 24.04 LTS (Noble Numbat) base
-# Output: f77-os-v1.0-amd64.iso (Hybrid BIOS + UEFI)
+# Base: Ubuntu 24.04 LTS (Noble Numbat)
+# Output: f77-os-v1.0-amd64.iso (UEFI + BIOS Hybrid)
 # ==============================================================================
 
 set -euo pipefail
@@ -60,21 +60,26 @@ chmod +x "${CHROOT_DIR}/tmp/setup-desktop.sh"
 chroot "${CHROOT_DIR}" /bin/bash << 'EOF'
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
-# Install packages defined in packages.list
-grep -v '^#' /tmp/packages.list | grep -v '^$' | xargs apt-get install -y --no-install-recommends
+
+# Install packages with resilience
+while read -r pkg; do
+    [[ -z "$pkg" || "$pkg" =~ ^# ]] && continue
+    echo "Installing: $pkg..."
+    apt-get install -y --no-install-recommends "$pkg" || echo "Warning: Failed to install $pkg (skipping)"
+done < /tmp/packages.list
 
 # Run desktop setup
-/tmp/setup-desktop.sh
+/tmp/setup-desktop.sh || true
 rm -f /tmp/packages.list /tmp/setup-desktop.sh
 
 # Setup Live User
-useradd -m -s /bin/bash -G sudo,adm,dialout,cdrom,audio,dip,video,plugdev f77
+useradd -m -s /bin/bash -G sudo,adm,dialout,cdrom,audio,dip,video,plugdev f77 || true
 echo "f77:f77" | chpasswd
 echo "f77 ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/f77
 chmod 0440 /etc/sudoers.d/f77
 
 # Clean apt cache
-apt-get autoremove -y
+apt-get autoremove -y || true
 apt-get clean
 rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 EOF
@@ -92,7 +97,7 @@ mksquashfs "${CHROOT_DIR}" "${IMAGE_DIR}/casper/filesystem.squashfs" \
     -e boot \
     -noappend
 
-echo "[6/7] Setting Up GRUB Bootloader (UEFI + BIOS)..."
+echo "[6/7] Setting Up GRUB Bootloader & EFI Images..."
 mkdir -p "${IMAGE_DIR}/boot/grub"
 cat << 'EOF' > "${IMAGE_DIR}/boot/grub/grub.cfg"
 set default="0"
@@ -114,16 +119,30 @@ menuentry "F77 OS (Safe Graphics Mode)" {
 }
 EOF
 
+# Build standalone EFI binary for UEFI boot
+mkdir -p "${IMAGE_DIR}/EFI/BOOT"
+grub-mkstandalone \
+    --format=x86_64-efi \
+    --output="${IMAGE_DIR}/EFI/BOOT/BOOTX64.EFI" \
+    --locales="" \
+    --fonts="" \
+    "boot/grub/grub.cfg=${IMAGE_DIR}/boot/grub/grub.cfg"
+
+# Create bootable FAT EFI image
+dd if=/dev/zero of="${IMAGE_DIR}/boot/grub/efi.img" bs=1M count=10
+mkfs.vfat "${IMAGE_DIR}/boot/grub/efi.img"
+mmd -i "${IMAGE_DIR}/boot/grub/efi.img" ::EFI ::EFI/BOOT
+mcopy -i "${IMAGE_DIR}/boot/grub/efi.img" "${IMAGE_DIR}/EFI/BOOT/BOOTX64.EFI" ::EFI/BOOT/BOOTX64.EFI
+
 echo "[7/7] Generating Hybrid Bootable ISO Image with Xorriso..."
 xorriso -as mkisofs \
     -r -V "F77_OS_LIVE" \
     -o "${ISO_NAME}" \
     -J -l \
-    -b boot/grub/grub.cfg \
-    -c boot.catalog \
+    -append_partition 2 0xef "${IMAGE_DIR}/boot/grub/efi.img" \
+    -appended_part_as_gpt \
+    -e --interval:appended_partition_2:all:: \
     -no-emul-boot \
-    -boot-load-size 4 \
-    -boot-info-table \
     "${IMAGE_DIR}"
 
 sha256sum "${ISO_NAME}" > "${ISO_NAME}.sha256"

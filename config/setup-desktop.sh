@@ -73,3 +73,4 @@ EOF
 chmod +x /usr/local/bin/f77-pentest
 
 echo "[F77 OS] Desktop & subsystem configuration completed successfully."
+
