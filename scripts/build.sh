@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# F77 OS - Live Bootable ISO Builder
+# F77 OS - High Performance Live Bootable ISO Builder
 # Base: Ubuntu 24.04 LTS (Noble Numbat)
 # Output: f77-os-v1.0-amd64.iso (Hybrid BIOS + UEFI Bootable)
 # ==============================================================================
@@ -15,6 +15,9 @@ WORK_DIR="$(pwd)/f77-build"
 CHROOT_DIR="${WORK_DIR}/chroot"
 IMAGE_DIR="${WORK_DIR}/image"
 ISO_NAME="f77-os-v1.0-amd64.iso"
+NUM_CORES=$(nproc || echo 4)
+
+echo "Detected CPU Cores: ${NUM_CORES}"
 
 # Cleanup any previous builds
 rm -rf "${WORK_DIR}"
@@ -65,14 +68,9 @@ echo "wireshark-common wireshark-common/install-setuid boolean true" | debconf-s
 
 apt-get update
 
-# Install all packages
+# Install all packages in a single high-speed transaction
 PACKAGES=$(grep -v '^#' /tmp/packages.list | grep -v '^$' | tr '\n' ' ')
-apt-get install -y --no-install-recommends ${PACKAGES} || {
-    echo "Batch install encountered missing package, falling back to individual installation..."
-    for pkg in ${PACKAGES}; do
-        apt-get install -y --no-install-recommends "$pkg" || echo "Skipped: $pkg"
-    done
-}
+apt-get install -y --no-install-recommends ${PACKAGES}
 
 # Run desktop setup
 /tmp/setup-desktop.sh || true
@@ -84,7 +82,7 @@ echo "f77:f77" | chpasswd
 echo "f77 ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/f77
 chmod 0440 /etc/sudoers.d/f77
 
-# Clean apt cache
+# Clean apt cache to reduce ISO size
 apt-get autoremove -y || true
 apt-get clean
 rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
@@ -104,9 +102,10 @@ fi
 cp "${VMLINUZ}" "${IMAGE_DIR}/casper/vmlinuz"
 cp "${INITRD}" "${IMAGE_DIR}/casper/initrd"
 
-echo "[5/6] Compressing Root Filesystem into SquashFS..."
+echo "[5/6] Compressing Root Filesystem into SquashFS (Multi-threaded fast compression)..."
 mksquashfs "${CHROOT_DIR}" "${IMAGE_DIR}/casper/filesystem.squashfs" \
-    -comp zstd \
+    -comp gzip -Xcompression-level 3 \
+    -processors "${NUM_CORES}" \
     -e boot \
     -noappend
 
@@ -132,7 +131,6 @@ menuentry "F77 OS (Safe Graphics Mode)" {
 }
 EOF
 
-# Use official grub-mkrescue which automatically creates hybrid UEFI + BIOS ISO
 grub-mkrescue -o "${ISO_NAME}" "${IMAGE_DIR}" -- -volid "F77_OS_LIVE"
 
 sha256sum "${ISO_NAME}" > "${ISO_NAME}.sha256"

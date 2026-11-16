@@ -12,7 +12,7 @@ jobs:
   build:
     name: Build F77 OS Hybrid ISO
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 240
 
     steps:
       - name: Checkout Repository

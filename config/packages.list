@@ -21,16 +21,15 @@ wpasupplicant
 wireless-tools
 bluez
 pipewire
-pipewire-audio
+wireplumber
 curl
 wget
 git
 sudo
 nano
 htop
-neofetch
 
-# Desktop Environment: KDE Plasma 6
+# Desktop Environment: KDE Plasma
 plasma-desktop
 plasma-workspace
 plasma-nm
