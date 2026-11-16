@@ -38,16 +38,6 @@ mount -t devpts devpts "${CHROOT_DIR}/dev/pts"
 mount -t proc proc "${CHROOT_DIR}/proc"
 mount -t sysfs sysfs "${CHROOT_DIR}/sys"
 
-cleanup() {
-    echo "[Cleanup] Unmounting virtual filesystems..."
-    umount -lf "${CHROOT_DIR}/dev/pts" || true
-    umount -lf "${CHROOT_DIR}/dev" || true
-    umount -lf "${CHROOT_DIR}/run" || true
-    umount -lf "${CHROOT_DIR}/proc" || true
-    umount -lf "${CHROOT_DIR}/sys" || true
-}
-trap cleanup EXIT
-
 echo "[3/6] Configuring Repositories & Installing Packages..."
 cat << 'EOF' > "${CHROOT_DIR}/etc/apt/sources.list"
 deb http://archive.ubuntu.com/ubuntu/ noble main restricted universe multiverse
@@ -102,11 +92,26 @@ fi
 cp "${VMLINUZ}" "${IMAGE_DIR}/casper/vmlinuz"
 cp "${INITRD}" "${IMAGE_DIR}/casper/initrd"
 
-echo "[5/6] Compressing Root Filesystem into SquashFS (Multi-threaded fast compression)..."
+echo "[CRITICAL FIX] Unmounting all virtual filesystems BEFORE SquashFS..."
+umount -lf "${CHROOT_DIR}/dev/pts" || true
+umount -lf "${CHROOT_DIR}/dev" || true
+umount -lf "${CHROOT_DIR}/run" || true
+umount -lf "${CHROOT_DIR}/proc" || true
+umount -lf "${CHROOT_DIR}/sys" || true
+
+# Recreate empty mountpoints so live-boot can mount them at boot
+mkdir -p "${CHROOT_DIR}/dev" "${CHROOT_DIR}/proc" "${CHROOT_DIR}/sys" "${CHROOT_DIR}/run"
+
+echo "[5/6] Compressing Root Filesystem into SquashFS (High-Speed Multi-Core)..."
 mksquashfs "${CHROOT_DIR}" "${IMAGE_DIR}/casper/filesystem.squashfs" \
     -comp gzip -Xcompression-level 3 \
     -processors "${NUM_CORES}" \
     -e boot \
+    -e proc \
+    -e sys \
+    -e dev \
+    -e run \
+    -e tmp \
     -noappend
 
 echo "[6/6] Setting Up GRUB & Building Hybrid ISO with grub-mkrescue..."
