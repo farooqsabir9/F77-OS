@@ -12,6 +12,14 @@ grub-efi-amd64-signed
 grub-pc-bin
 shim-signed
 
+# Display Server & Graphic Drivers (Mandatory for GUI to render!)
+xorg
+xserver-xorg
+xserver-xorg-video-all
+xserver-xorg-input-all
+kwin-x11
+kwin-wayland
+
 # System Services & Network
 systemd
 systemd-sysv

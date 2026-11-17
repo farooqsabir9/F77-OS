@@ -53,7 +53,16 @@ plugin=org.kde.panel
 alignment=center
 EOF
 
-# 5. Create F77 Quick-Launch Helper for Android & Windows
+# 5. Configure SDDM Autologin for Live Session (Critical for Plymouth to exit!)
+mkdir -p /etc/sddm.conf.d
+cat << 'EOF' > /etc/sddm.conf.d/autologin.conf
+[Autologin]
+User=f77
+Session=plasma
+Relogin=false
+EOF
+
+# 6. Create F77 Quick-Launch Helper for Android & Windows
 cat << 'EOF' > /usr/local/bin/f77-android
 #!/usr/bin/env bash
 echo "Launching F77 Android Subsystem (Waydroid)..."
@@ -73,4 +82,3 @@ EOF
 chmod +x /usr/local/bin/f77-pentest
 
 echo "[F77 OS] Desktop & subsystem configuration completed successfully."
-
