@@ -72,6 +72,10 @@ echo "f77:f77" | chpasswd
 echo "f77 ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/f77
 chmod 0440 /etc/sudoers.d/f77
 
+# Force update initramfs with Casper live hooks
+echo "[F77 OS] Updating initramfs with Casper hooks..."
+update-initramfs -u -k all
+
 # Clean apt cache to reduce ISO size
 apt-get autoremove -y || true
 apt-get clean

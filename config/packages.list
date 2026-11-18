@@ -4,6 +4,8 @@
 
 # Core System & Linux Kernel
 linux-generic
+initramfs-tools
+busybox-initramfs
 casper
 discover
 laptop-detect
